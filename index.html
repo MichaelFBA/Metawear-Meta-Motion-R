@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>MetaCube Demo</title>
+    <style>
+      html,
+      body,
+      canvas {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        font-size: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="https://cdn.babylonjs.com/cannon.js"></script>
+    <script src="https://preview.babylonjs.com/babylon.js"></script>
+    <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.js"></script>
+
+    <canvas id="render-canvas"></canvas>
+    <script>
+      // ------------------------------------------
+      //  3D ENGINE
+      // ------------------------------------------
+
+      // https://developer.mozilla.org/en-US/docs/Games/Techniques/3D_on_the_web/Building_up_a_basic_demo_with_Babylon.js
+      var canvas = document.getElementById("render-canvas");
+      var engine = new BABYLON.Engine(canvas);
+
+      var scene = new BABYLON.Scene(engine);
+      scene.clearColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+
+      var gravityVector = new BABYLON.Vector3(0, 0, 0);
+      var physicsPlugin = new BABYLON.CannonJSPlugin();
+      scene.enablePhysics(gravityVector, physicsPlugin);
+      // scene.enablePhysics();
+
+      var camera = new BABYLON.FreeCamera(
+        "camera",
+        new BABYLON.Vector3(0, 0, -10),
+        scene
+      );
+      var pl = new BABYLON.PointLight(
+        "light",
+        new BABYLON.Vector3(10, 10, 0),
+        scene
+      );
+
+      var light = new BABYLON.HemisphericLight(
+        "light1",
+        new BABYLON.Vector3(0, 10, 0),
+        scene
+      );
+      light.intensity = 0.7;
+
+      // ------------------------------------------
+      //  3D OBJECT
+      // ------------------------------------------
+
+      var options = {
+        width: 2,
+        height: 2,
+        depth: 2,
+        faceColors: [
+          new BABYLON.Color4(1, 0, 1, 1), //
+          new BABYLON.Color4(0, 1, 0, 1), // green front
+          new BABYLON.Color4(0, 1, 1, 1), // red right
+          new BABYLON.Color4(0, 0, 1, 1), // blue left
+          new BABYLON.Color4(1, 0, 0, 1), // red top
+          new BABYLON.Color4(1, 1, 0, 1) // yellow
+        ]
+      };
+
+      var box = BABYLON.MeshBuilder.CreateBox("box", options, scene);
+      //var boxMaterial = new BABYLON.StandardMaterial("material", scene);
+      //boxMaterial.emissiveColor = new BABYLON.Color3(0, 0.58, 0.86);
+      //box.material = boxMaterial;
+
+      let quaternion = new BABYLON.Quaternion();
+      box.rotationQuaternion = quaternion;
+      box.physicsImpostor = new BABYLON.PhysicsImpostor(
+        box,
+        BABYLON.PhysicsImpostor.BoxImpostor,
+        { mass: 1, restitution: 0.9 },
+        scene
+      );
+
+      /*
+        BABYLON.SceneLoader.Append("./dove/", "dove.fbx", scene, function (scene) {
+            // Create a default arc rotate camera and light. 
+            scene.createDefaultCameraOrLight(true, true, true); 
+            // The default camera looks at the back of the asset.
+            // Rotate the camera by 180 degrees to the front of the asset.
+            scene.activeCamera.alpha += Math.PI;
+        });
+        */
+      /*
+        BABYLON.SceneLoader.Append("./BoomBox/glTF/", "BoomBox.gltf", scene, function (scene) {
+            // Create a default arc rotate camera and light.
+            scene.createDefaultCameraOrLight(true, true, true);
+            // The default camera looks at the back of the asset.
+            // Rotate the camera by 180 degrees to the front of the asset.
+            scene.activeCamera.alpha += Math.PI;
+        });*/
+
+      // ------------------------------------------
+      //  Socket.io
+      // ------------------------------------------
+
+      var socket = io.connect("localhost:8080");
+      socket.on("quaternion", function(qtn) {
+        // console.log('Quaternion : ', qtn);
+        quaternion.x = qtn.x;
+        quaternion.y = qtn.y;
+        quaternion.z = qtn.z;
+        quaternion.w = qtn.w;
+      });
+
+      var acc0 = undefined;
+      var vel0 = new BABYLON.Vector3();
+      socket.on("acc", function(acc1) {
+        if (!acc0) {
+          acc0 = acc1;
+          return;
+        }
+        var t = (acc1.t - acc0.t) / 1000.0;
+
+        acc0.x += acc1.x;
+        acc0.y += acc1.y;
+        acc0.z += acc1.z;
+
+        vel0.x += acc1.x * t;
+        vel0.y += acc1.y * t;
+        vel0.z += acc1.z * t;
+
+        acc0.t = acc1.t;
+        box.physicsImpostor.setLinearVelocity(acc0);
+        //box.physicsImpostor.setLinearVelocity(velo0);
+        //console.log(velocity.x,  velocity.y, velocity.z, t);
+      });
+
+      //socket.emit('message', { content: 'Hello World', priority: '1' });
+
+      // ------------------------------------------
+      //  LOOP
+      // ------------------------------------------
+
+      var t = 0;
+      var renderLoop = function() {
+        scene.render();
+        t -= 0.01;
+      };
+      engine.runRenderLoop(renderLoop);
+    </script>
+  </body>
+</html>
